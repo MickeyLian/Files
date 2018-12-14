@@ -17,3 +17,7 @@
 * 6、输入git push -u origin master，这是把代码上传到github仓库的意思。
 ### 在git上修改了文件内容，在git上需要的命令：
 * git pull
+### git 修改文件夹名字
+* git mv -f oldfolder newfolder
+* git add -u newfolder (-u选项会更新已经追踪的文件和文件夹)
+* git commit -m "changed the foldername whaddup"
