@@ -1,0 +1,151 @@
+NoSQL入门：
+NoSQL:Not Only SQL 非关系型数据库
+
+为什么需要NoSQL
+高并发读写；海量数据的高效率存储和访问；高可扩展性和高可用性；
+
+Redis由来：一家公司由于不满MySQL的数据库，于是自己开发了一个数据库，在2009年完成（用C语言开发的）
+
+Redis控制5种数据类型：
+String、list、hash、set、sorted-set
+
+存储字符串String（最大长度512M）
+常用命令：get、set、getset(先获取再赋值)、del、
+incr(自增，若不存在，默认为0，再自增)、decr(自减，若不存在，默认为0，再自减)、
+incrby key 5(key+5)、decrby key 5(key-5)、
+append (追加)
+
+存储Hash
+常用命令：
+hset(hset myhash username jack),
+hmset(设置多个键值对 hset myhash2 username jack age 22),
+hget(hget myhash username),
+hgetall(获取全部)
+hdel(删除 hdel myhash2 username age)
+hincrby(增加)
+hexists(判断是否存在 hexists myhash username 返回0不存在，1存在)
+hlen (获取属性长度)  hkeys(hkeys myhash) hvals(hvals myhash)
+ 
+存储list
+lpush:左侧添加 lpush mylist a b c  返回 c b a
+rpush:右侧添加 rpush mylist a b c  返回 a b c
+lrange: 查看 lrange mylist 0 5(5可写成-1，代表倒数第一个；6个数据)
+lpop: 弹出第一个  如果弹出某个数据，查看时，之前弹出的数据不存在
+llen: 列表长度
+lpushx: 左侧添加，但是列表要存在 lpushx mylist x 
+rpushx: 右侧添加，同上
+lrem: 删除count个value的元素，如果count>0,从头向尾遍历，并删除;如果count<0,就会从后向前遍历并删除；如果count为0，删除所有未value的元素 如：lrem mylist 2 3  ：删除mylist中2个为‘3’的元素
+lset:在第几个角标上替换元素  如：lset mylist 3 m  在第三个角标上替换为‘m’
+linsert:在某个元素之前或之后插入元素  如:linsert mylist before b 11  在‘b’之前插入‘11’；
+linsert mylist after b 22 在‘b’之后插入‘22’
+rpoplpush:将一个链表的最后一个元素弹出放到另一个链表的首部  如：rpoplpush mylist mylist1
+
+存储set  和list不同的是：set不允许出现重复的元素
+常用命令：
+sadd:添加  如：sadd myset a b c    如果再次sadd myset a  返回<integer> 0
+srem:删除  如：srem myset 1 2 
+smembers:查看 
+sismember: 判断元素是否在set里面(返回1 存在；0不存在)
+sdiff:(差集)比较两个set相差的元素 如：mya1(a,b,c);myb1(a,c,1,2) 命令:sdiff mya1 myb1 返回‘b’
+sinter:（交集） 如 sinter mya1 myb1  返回‘a c’
+sunion:（并集） 如 sunion mya1 myb1  返回‘1 2 a b c’
+scard:集合总数
+srandmember:随机返回集合中的某个元素
+sdiffstore:将两个集合相差的元素存储到另一个集合上  sdiffstore my1 mya1 myb1  my1里面就有'b'
+sinterstore:把两个集合的交集存储到另一个集合上
+sunionstore:把两个集合的并集存储到另一个集合上
+
+存储sorted-set   （使用场景：游戏排行榜、构建索引数据）
+和set不同的是每个元素都会关联一个double类型的分数。redis正是通过分数来为集合中的成员进行从小到大的排序。    有序集合的成员是唯一的,但分数(score)却可以重复。
+zadd:添加  zadd mysort 70 zs 80 ls 90 ww
+zscore:查找某一个的分数   zscore mysort zs  返回 70
+zrange:查找mysort的里面的内容（由小到大） zrange mysort 0 -1 (withscores)  后面withscores 会将分数加上
+zrevrange:查找mysort的里面的内容（由大到小）
+zremrangebyrank:按照排名的范围删除  zremrangebyrank mysort 0 2
+zremrangebyscore:按照分数排名删除 zremrangebyscore mysort 70 90
+zrangebyscore:查找并排序（默认从小到大） zrangebyscore mysort 70 80 withscores limit 0 2（显示两个）
+zincrby:向某个元素加几  zincrby mysort 3 wang
+zcount:查看分数范围内有多少个  zcount mysort 70 90  
+
+干什么？
+添加数据，删除数据，获取数据，查看有多少个数据，判断元素是否在集合中，key的通用操作
+Jedis:通俗的讲，Java操作redis
+
+redis常用命令：
+1、select （0-15） 选中第几号仓库  相当于MySQL的USE
+2、echo 在命令行打印一些内容  相当于程序中的System.out.println
+3、quit 退出连接
+4、dbsize  返回当前数据库中key的数目
+5、info  获取服务器的信息和统计
+6、flushdb 删除当前选择数据库中的所有key  
+7、flushall  删除所有数据库中的所有key   （不会使用）
+8、move name 1  移动当前的key‘name’到1仓库
+9、ping 测试连接是否存活  （存在 返回pong）
+10、incr num  对key‘num’自增  incrby num 5 :num + 5
+11、rename 重命名
+12、type key  获得key的类型
+
+redis特性：
+一个redis实例最多可提供16个数据库，0-15 可以通过select连接来选择数据库（0为默认），相当于MySQL的use
+一台机器上可以启动多个redis，修改redis对应的端口就行
+
+消息订阅与发布
+subscribe channel:订阅频道，例：subscribe mychat,订阅mychat这个频道
+psubscribe channel*:批量订阅频道，例：psubscribe s* ,订阅以‘s’开头的频道
+publish channel content:在指定的频道中发布消息，如 publish mychat 'today is a newday'
+
+一般开启三个窗口，
+第一个窗口subscribe mychat，接收mychat频道
+第二个窗口psubscribe my*  接收以my开头的频道
+第三个窗口publish mychat '111' 在mychat上发布消息，如果publish mychat2 '222' 只会在以my开头的频道上接收到
+
+Redis事务：要么同时成功，要么同时失败
+在Redis中，multi/exec/discard 这三个命令是实现事务的基石
+
+通过mutil开启一个事务，类似begin transaction，该语句执行之后执行的命令都视为事务之内的操作，再通过exec/discard命令来提交/回滚该事务内的所有操作，等同于关系型数据库中的commit/rollback语句，
+
+在事务中，如果出现异常，其后的命令仍然会被执行
+
+Redis 持久化：
+Redis的高性能是由于其将所有数据都存储在了内存中，为了使Redis在重启之后仍然能保持数据不丢失，需要将数据从内存中同步到硬盘中，这一过程就叫做持久化
+
+两种持久化方式
+RDB持久化（默认支持，不需要配置）
+AOF持久化（以日志的形式记录服务器所处理的每一个操作 ） 如果要使用AOF 需要将redis.conf中的appendonly no 的no改为yes ，就会产生一个文件（appendonly.aof）
+无持久化
+同时使用RDB和AOF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                       
+			                                                    
