@@ -1,0 +1,126 @@
+SpringBoot集成百度Ueditor:
+遇到的问题：
+	将下载好的ueditor放入static目录下，能正常显示，但是上传多张图片报“请求后台配置项http错误，上传功能将不能正常使用！”；
+问题解决：我是自定义上传的     参照：https://blog.csdn.net/m0_38129431/article/details/80462233
+
+第一步：下载Ueditor,
+	地址：http://ueditor.baidu.com/build/build_down.php?n=ueditor&v=1_4_3_3-utf8-jsp；完成后将文件夹名改为ueditor,并复制此文件夹到
+SpringBoot项目的/resources/static目录下。
+第二步：修改文件上传配置路径：
+	打开ueditor目录下的ueditor.config.js文件，修改serverUrl（serverUrl: "http://localhost:8080/ueditor/"），原先是（serverUrl: URL + 
+	"jsp/controller.jsp"），原先进入到controller.jsp，返回当前目录下的conf.json里面的内容；所以我们要模拟出conf.json里面的内容。
+	编写controller请求，返回自定义的json字符串
+	
+	@RequestMapping(value = "/ueditor")
+    @ResponseBody
+    public String ueditor(HttpServletRequest request, HttpServletResponse response) {
+        String s = "{\n"+
+                "            \"imageActionName\": \"uploadimage\",\n" +
+                "                \"imageFieldName\": \"file\", \n" +
+                "                \"imageMaxSize\": 2048000, \n" +
+                "                \"imageAllowFiles\": [\".png\", \".jpg\", \".jpeg\", \".gif\", \".bmp\"], \n" +
+                "                \"imageCompressEnable\": true, \n" +
+                "                \"imageCompressBorder\": 1600, \n" +
+                "                \"imageInsertAlign\": \"none\", \n" +
+                "                \"imageUrlPrefix\": \"\",\n" +
+                "                \"imagePathFormat\": \"/ueditor/jsp/upload/image/{yyyy}{mm}{dd}/{time}{rand:6}\" }";
+        return s;
+    }
+	
+第三步：请求完成后，就要自定义上传图片的处理逻辑；在你需要集成ueditor的jsp中加入ueditor上传图片的上传功能：
+	<script type="text/javascript">
+		var ue = UE.getEditor('container');
+		UE.Editor.prototype._bkGetActionUrl = UE.Editor.prototype.getActionUrl;
+		UE.Editor.prototype.getActionUrl = function(action) {
+			if (action == 'uploadimage' || action == 'uploadscrawl' || action == 'uploadimage') {
+				return 'http://localhost:8080/imgUpdate'; //在这里返回我们实际的上传图片地址
+			} else {
+				return this._bkGetActionUrl.call(this, action);
+			}
+		}
+	</script>
+	其后台的imgUpdate如下： 注意：这里的参数file要和imageFieldName的参数一致。
+	@Autowired
+    private ConfigUtil configUtil;     
+	
+	@RequestMapping(value = "/imgUpdate")
+    @ResponseBody
+    public String imgUpdate(MultipartFile file,HttpServletRequest request) {
+        //System.out.println("测试");
+        if (file.isEmpty()) {
+            return "error";
+        }
+        // 获取文件名
+        String fileName = file.getOriginalFilename();
+        // 获取文件的后缀名
+        String suffixName = fileName.substring(fileName.lastIndexOf("."));
+        // 这里我使用随机字符串来重新命名图片
+        fileName=Calendar.getInstance().getTimeInMillis()+suffixName;
+        String imgPath=configUtil.getImgPath();
+        String uploadpath=imgPath.substring(imgPath.indexOf(":")+1);
+        System.out.println(uploadpath);
+        //String uploadpath="D:/image/";
+        //String uploadpath=request.getSession().getServletContext().getRealPath("image/");
+        File localFile=new File(uploadpath);
+        File dest = new File(localFile,fileName);
+        // 检测是否存在目录
+        if (!localFile.exists()) {
+            localFile.mkdirs();
+        }
+        try {
+            file.transferTo(dest);
+            //url的值为图片的实际访问地址，访问的路径是http://localhost/uploadfile/xxx.png
+            String config = "{\"state\": \"SUCCESS\"," +
+                    "\"url\": \"" + "http://localhost:8080/uploadfile/" + fileName + "\"," +
+                    "\"title\": \"" + fileName + "\"," +
+                    "\"original\": \"" + fileName + "\"}";
+            System.out.println(config);
+            return config;
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "error";
+	}
+		
+	ConfigUtil这个类实际上是图片路径的实体类，这里的图片路径是写在application.properties的setting.imgPath属性  setting.imgPath=file:D:/image/
+	参照：https://blog.csdn.net/co_zjw/article/details/82897097
+	
+	@RestController
+	@Component
+	public class ConfigUtil {
+		@Value("${setting.imgPath}")    //这里对应application.properties的setting.imgPath属性
+		public  String imgPath;
+		public String getImgPath() {
+			return imgPath;
+		}
+		public void setImgPath(String imgPath) {
+			this.imgPath = imgPath;
+		}	
+		@RequestMapping(value = "/getproperties")
+		public String getpro(){
+			String path=imgPath.substring(imgPath.indexOf(":")+1);
+			return "imgPath:"+imgPath+"path:"+path;
+		}
+	}
+	
+	还有一个点就是：http://localhost/uploadfile/xxx.png  通过请求拿到图片，这肯定是要配置的不然无缘无故出来个/uploadfile/路径下的图片，肯定会报错
+	我这里写了一个配置类：添加自定义映射配置
+	
+	@Configuration
+	public class WebConfig extends WebMvcConfigurerAdapter {
+		ResourceBundle resourceBundle = ResourceBundle.getBundle("application");  //读取application.properties文件内容
+		String imgPath = resourceBundle.getString("setting.imgPath");			//获取该配置文件的setting.imgPath属性 file:D:/image/
+
+		public void addResourceHandlers(ResourceHandlerRegistry registry) {
+			System.out.println(imgPath);
+			//将/uploadfile/**映射到file:D:/image/下的图片，从而http://localhost/uploadfile/xxx.png   就能拿到D:/image/xxx.png 的xxx.png图片
+			registry.addResourceHandler("/uploadfile/**").addResourceLocations(imgPath);  
+			super.addResourceHandlers(registry);
+		}
+	}
+	
+	大致就是这样了！
+		
+	
